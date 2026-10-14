@@ -823,12 +823,13 @@ function startGame() {
   fillBots();
 
   APP.players.forEach(p => {
-    p.correct = 0;
-    p.wrong = 0;
-    p.score = 0;
-    p.lockedUntil = 0;
-    p.skill = p.isBot ? rand(0.76, 0.92) : 1;
-  });
+  p.correct = 0;
+  p.wrong = 0;
+  p.score = 0;
+  p.lockedUntil = 0;
+  // Bot Pemula: akurasi rendah (35%–55%)
+  p.skill = p.isBot ? rand(0.35, 0.55) : 1;
+});
 
   buildQuestions();
   buildField();
@@ -942,10 +943,11 @@ function renderQuestion() {
     `<b>${escapeHtml(q.romaji)}</b> &middot; cari padanan <b>${q.jawabScript.toUpperCase()}</b>`;
 }
 
-/* ---------------- BOT AI (tingkat kepintaran sedang) ---------------- */
+/* ---------------- BOT AI (TINGKAT PEMULA) ---------------- */
 function scheduleBot(bot, attempt) {
-  const base = attempt === 0 ? rand(1000, 2500) : rand(700, 1500);
-  const penalty = (1 - bot.skill) * 2200;
+  // Bot pemula bereaksi lambat: 2,5 – 5 detik (percobaan pertama)
+  const base = attempt === 0 ? rand(2500, 5000) : rand(1800, 3200);
+  const penalty = (1 - bot.skill) * 3500;      // penalti lebih besar → makin lambat
   const delay = base + penalty;
 
   const t = setTimeout(() => {
@@ -954,7 +956,8 @@ function scheduleBot(bot, attempt) {
     const correctCard = APP.field.find(c => !c.taken && c.kana === APP.current.jawabKana);
     if (!correctCard) return;
 
-    const accuracy = Math.min(0.97, bot.skill + (attempt > 0 ? 0.12 : 0));
+    // Bonus belajar kecil saat percobaan kedua (tetap rendah untuk pemula)
+    const accuracy = Math.min(0.70, bot.skill + (attempt > 0 ? 0.08 : 0));
     const willBeRight = Math.random() < accuracy;
 
     if (willBeRight) {
@@ -962,6 +965,7 @@ function scheduleBot(bot, attempt) {
     } else {
       const wrongs = APP.field.filter(c => !c.taken && c.kana !== APP.current.jawabKana);
       if (wrongs.length) {
+        // Bot pemula cenderung memilih kartu acak (bukan yang mirip)
         botPick(bot, wrongs[randInt(0, wrongs.length - 1)]);
       } else {
         botPick(bot, correctCard);
@@ -981,7 +985,7 @@ function botPick(bot, card) {
     return;
   }
 
-  // Bot salah ambil kartu
+  // Bot salah ambil kartu → tetap bisa mencoba lagi, tapi lambat
   bot.wrong++;
   APP.roundWrong.push({ player: bot.name, picked: card.kana, pickedScript: card.script });
   if (el) {
