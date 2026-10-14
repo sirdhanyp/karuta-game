@@ -388,7 +388,7 @@ body::before{
     <div class="question-box" id="questionBox">
       <div class="q-label" id="qLabel">SOAL 1 / 12</div>
       <div class="q-kana" id="qKana">あ</div>
-      <div class="q-hint" id="qHint">a — cari padanan KATAKANA</div>
+      <div class="q-hint" id="qHint">a (Hiragana) — klik huruf yang sama di lapangan</div>
     </div>
   </div>
 
@@ -547,7 +547,7 @@ const MATERI_DEFAULT = {
   y: "Kelompok Y (ya, yu, yo). Hanya terdiri dari 3 huruf.",
   r: "Kelompok R (ra, ri, ru, re, ro). Dibaca 'r' + vokal.",
   w: "Kelompok W (wa, wo). 'wo' dilafalkan seperti 'o'.",
-  "n-akhir": "Huruf 'n' (ん / ン) adalah satu-satunya huruf konsonan tunggal dalam bahasa Jepang."
+  "n-akhir": "konsonan tunggal (bukan konsonan + vokal) dan satu-satunya huruf konsonan mandiri dalam bahasa Jepang. Dilafalkan 'n'."
 };
 
 const SETTINGS_DEFAULT = {
@@ -564,7 +564,7 @@ function buildFallbackDB() {
     return { id: i + 1, romaji, hiragana, katakana, grup };
   });
   return {
-    versi: '1.0',
+    versi: '1.1',
     aplikasi: 'KARUTA',
     pembuat: 'Danz Sensei',
     pengaturan: { ...SETTINGS_DEFAULT },
@@ -754,7 +754,7 @@ function addBot() {
   const name = botQueue.shift() || ('Bot ' + (APP.players.length));
   APP.players.push({
     id: APP.players.length, name, isBot: true,
-    correct: 0, wrong: 0, score: 0, lockedUntil: 0, skill: 0.85
+    correct: 0, wrong: 0, score: 0, lockedUntil: 0, skill: 0.45
   });
 }
 
@@ -788,21 +788,30 @@ function clearAllTimers() {
   if (APP.lobbyInterval) { clearInterval(APP.lobbyInterval); APP.lobbyInterval = null; }
 }
 
+/* ---------------------------------------------------------
+   ✅ FIX #1 — Mode SAME-SCRIPT
+   Soal dan jawaban memakai huruf yang SAMA (tidak menyeberang
+   antara hiragana ↔ katakana). Sesuai desain dokumen KARUTA.
+   --------------------------------------------------------- */
 function buildQuestions() {
   const n = Math.min(APP.settings.jumlahSoal, APP.db.huruf.length);
   const pool = shuffle(APP.db.huruf).slice(0, n);
 
   APP.questions = pool.map(h => {
     const tanyaHiragana = Math.random() < 0.5;
+    const soalKana   = tanyaHiragana ? h.hiragana : h.katakana;
+    const soalScript = tanyaHiragana ? 'Hiragana' : 'Katakana';
+
     return {
-      romaji: h.romaji,
-      grup: h.grup,
+      romaji:   h.romaji,
+      grup:     h.grup,
       hiragana: h.hiragana,
       katakana: h.katakana,
-      soalKana: tanyaHiragana ? h.hiragana : h.katakana,
-      soalScript: tanyaHiragana ? 'Hiragana' : 'Katakana',
-      jawabKana: tanyaHiragana ? h.katakana : h.hiragana,
-      jawabScript: tanyaHiragana ? 'Katakana' : 'Hiragana'
+      soalKana:   soalKana,
+      soalScript: soalScript,
+      // ✅ JAWABAN = HURUF YANG SAMA DENGAN SOAL
+      jawabKana:   soalKana,
+      jawabScript: soalScript
     };
   });
 }
@@ -827,7 +836,8 @@ function startGame() {
     p.wrong = 0;
     p.score = 0;
     p.lockedUntil = 0;
-    p.skill = p.isBot ? rand(0.76, 0.92) : 1;
+    // ✅ FIX #2 — Bot Pemula: akurasi rendah (35% – 55%)
+    p.skill = p.isBot ? rand(0.35, 0.55) : 1;
   });
 
   buildQuestions();
@@ -876,6 +886,7 @@ function renderField() {
   const field = $('#field');
   field.innerHTML = '';
   APP.field.forEach(c => {
+    if (c.taken) return;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'kana-card';
@@ -934,18 +945,20 @@ function nextRound() {
   }, APP.settings.durasiSoalDetik * 1000);
 }
 
+/* ✅ FIX #1 (lanjutan) — Hint menyesuaikan mode same-script */
 function renderQuestion() {
   const q = APP.current;
   $('#qLabel').textContent = `SOAL ${APP.qIndex + 1} / ${APP.questions.length}`;
   $('#qKana').textContent = q.soalKana;
   $('#qHint').innerHTML =
-    `<b>${escapeHtml(q.romaji)}</b> &middot; cari padanan <b>${q.jawabScript.toUpperCase()}</b>`;
+    `<b>${escapeHtml(q.romaji)}</b> (${q.soalScript}) &middot; klik huruf yang <b>sama</b> di lapangan`;
 }
 
-/* ---------------- BOT AI (tingkat kepintaran sedang) ---------------- */
+/* ---------------- BOT AI (TINGKAT PEMULA) ---------------- */
+/* ✅ FIX #2 — Bot pemula: reaksi lambat (2,5–5 dtk), akurasi 35–55% */
 function scheduleBot(bot, attempt) {
-  const base = attempt === 0 ? rand(1000, 2500) : rand(700, 1500);
-  const penalty = (1 - bot.skill) * 2200;
+  const base = attempt === 0 ? rand(2500, 5000) : rand(1800, 3200);
+  const penalty = (1 - bot.skill) * 3500;
   const delay = base + penalty;
 
   const t = setTimeout(() => {
@@ -954,7 +967,7 @@ function scheduleBot(bot, attempt) {
     const correctCard = APP.field.find(c => !c.taken && c.kana === APP.current.jawabKana);
     if (!correctCard) return;
 
-    const accuracy = Math.min(0.97, bot.skill + (attempt > 0 ? 0.12 : 0));
+    const accuracy = Math.min(0.70, bot.skill + (attempt > 0 ? 0.08 : 0));
     const willBeRight = Math.random() < accuracy;
 
     if (willBeRight) {
@@ -1176,43 +1189,62 @@ function buildReport() {
   L.push(`  Total Skor                     : ${me.score}`);
   L.push('');
 
-  // Rincian kesalahan + koreksi materi singkat
-  const myMistakes = [];
+  /* ✅ FIX #3 — Kelompokkan kesalahan PER SOAL (bukan per klik)
+     agar tidak ada entri soal duplikat di laporan. */
+  const mistakesBySoal = new Map();
   r.log.forEach(l => {
-    l.salah.filter(s => s.player === me.name).forEach(s => {
-      myMistakes.push({
-        no: l.no,
-        soalKana: l.soalKana,
-        soalScript: l.soalScript,
-        jawabKana: l.jawabKana,
-        jawabScript: l.jawabScript,
-        romaji: l.romaji,
-        grup: l.grup,
-        hiragana: l.hiragana,
-        katakana: l.katakana,
-        picked: s.picked,
-        pickedScript: s.pickedScript
+    const myWrongs = l.salah.filter(s => s.player === me.name);
+    if (myWrongs.length > 0) {
+      if (!mistakesBySoal.has(l.no)) {
+        mistakesBySoal.set(l.no, {
+          no: l.no,
+          soalKana: l.soalKana,
+          soalScript: l.soalScript,
+          jawabKana: l.jawabKana,
+          jawabScript: l.jawabScript,
+          romaji: l.romaji,
+          grup: l.grup,
+          hiragana: l.hiragana,
+          katakana: l.katakana,
+          wrongPicks: []
+        });
+      }
+      const entry = mistakesBySoal.get(l.no);
+      myWrongs.forEach(s => {
+        entry.wrongPicks.push({ kana: s.picked, script: s.pickedScript });
       });
-    });
+    }
   });
 
   L.push(dash);
   L.push('  DETAIL KARTU YANG GAGAL DITEBAB & KOREKSINYA');
   L.push(dash);
-  if (!myMistakes.length) {
+  if (mistakesBySoal.size === 0) {
     L.push('  Luar biasa! Tidak ada kartu yang salah kamu ambil. 🎉');
     L.push('');
   } else {
-    myMistakes.forEach(m => {
-      L.push('');
-      L.push(`  Soal #${m.no}`);
-      L.push(`    Soal          : ${m.soalKana}  (${m.soalScript})`);
-      L.push(`    Bacaan        : ${m.romaji}`);
-      L.push(`    Jawaban benar : ${m.jawabKana}  (${m.jawabScript})`);
-      L.push(`    Jawabanmu     : ${m.picked}  (${m.pickedScript})   [SALAH]`);
-      L.push(`    Materi singkat: Huruf "${m.romaji}" termasuk ${materiText(m.grup)}`);
-      L.push(`                    Pasangan hurufnya -> Hiragana: ${m.hiragana}  |  Katakana: ${m.katakana}`);
-    });
+    Array.from(mistakesBySoal.values())
+      .sort((a, b) => a.no - b.no)
+      .forEach(m => {
+        L.push('');
+        L.push(`  Soal #${m.no}`);
+        L.push(`    Soal          : ${m.soalKana}  (${m.soalScript})`);
+        L.push(`    Bacaan        : ${m.romaji}`);
+        L.push(`    Jawaban benar : ${m.jawabKana}  (${m.jawabScript})`);
+
+        if (m.wrongPicks.length === 1) {
+          L.push(`    Jawabanmu     : ${m.wrongPicks[0].kana}  (${m.wrongPicks[0].script})   [SALAH]`);
+        } else {
+          L.push(`    Jawabanmu     :`);
+          m.wrongPicks.forEach(w => {
+            L.push(`                    - ${w.kana}  (${w.script})   [SALAH]`);
+          });
+          L.push(`    Total salah   : ${m.wrongPicks.length}× percobaan`);
+        }
+
+        L.push(`    Materi singkat: Huruf "${m.romaji}" termasuk ${materiText(m.grup)}`);
+        L.push(`                    Pasangan hurufnya -> Hiragana: ${m.hiragana}  |  Katakana: ${m.katakana}`);
+      });
     L.push('');
   }
 
@@ -1369,6 +1401,7 @@ async function init() {
   showScreen('home');
 
   console.log('[KARUTA] Aplikasi siap. Total huruf:', APP.db.huruf.length);
+  console.log('[KARUTA] Mode: same-script | Bot: Pemula (35–55%)');
 }
 
 document.addEventListener('DOMContentLoaded', init);
