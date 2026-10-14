@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KARUTA — Permainan Kartu Huruf Hiragana &amp; Katakana</title>
+<style>
+/* =========================================================
+   PALET WARNA (Color Hunt) : Putih – Krem – Peach – Merah
+   ========================================================= */
+:root{
+  --putih:#FFFCF5;
+  --krem:#FBEED3;
+  --peach:#F7D9A1;
+  --merah:#E01E37;
+  --merah-tua:#A8101F;
+  --merah-muda:#FBE1E4;
+  --teks:#3B2A21;
+  --teks-lembut:#93806F;
+  --hijau:#2E9E63;
+  --radius:18px;
+  --jp-font:'Yu Gothic','Hiragino Kaku Gothic ProN','Meiryo','Noto Sans JP','MS PGothic',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,'Helvetica Neue',sans-serif;
+  background:var(--putih);
+  color:var(--teks);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+/* garis aksen atas dari palet */
+body::before{
+  content:'';position:fixed;top:0;left:0;right:0;height:6px;z-index:999;
+  background:linear-gradient(90deg,var(--krem) 0 33.33%,var(--peach) 33.33% 66.66%,var(--merah) 66.66% 100%);
+}
+
+/* ================= SCREEN / LAYOUT ================= */
+.screen{display:none;animation:fade .3s ease;}
+.screen.active{display:block;}
+@keyframes fade{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:none;}}
+
+.wrap{max-width:1080px;margin:0 auto;padding:34px 18px 70px;}
+.center-wrap{max-width:680px;margin:0 auto;padding:34px 18px 70px;text-align:center;}
+
+/* ================= BRAND ================= */
+.brand{text-align:center;margin-bottom:30px;}
+.brand h1{
+  font-size:clamp(1.8rem,6vw,3rem);letter-spacing:.38em;text-indent:.38em;
+  font-weight:800;color:var(--teks);
+}
+.brand p{color:var(--teks-lembut);font-size:.8rem;letter-spacing:.28em;margin-top:4px;}
+.brand.small h1{font-size:1.25rem;letter-spacing:.28em;text-indent:.28em;}
+.brand.small p{font-size:.58rem;letter-spacing:.2em;}
+
+/* ================= MENU UTAMA ================= */
+.menu-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+@media(max-width:840px){.menu-grid{grid-template-columns:1fr;}}
+.menu-card{
+  background:#fff;border:2px solid rgba(224,30,55,.35);border-radius:var(--radius);
+  padding:22px 18px;display:flex;flex-direction:column;gap:14px;justify-content:space-between;
+  min-height:238px;text-align:center;transition:.2s;
+}
+.menu-card:hover{border-color:var(--merah);box-shadow:0 12px 26px rgba(224,30,55,.13);transform:translateY(-3px);}
+.menu-card h2{font-size:1.05rem;letter-spacing:.02em;}
+.menu-card .desc{font-size:.78rem;color:var(--teks-lembut);line-height:1.6;}
+.menu-card .spacer{flex:1;}
+
+/* ================= BUTTON ================= */
+.btn{
+  display:inline-block;border:none;cursor:pointer;font-family:inherit;
+  background:var(--merah);color:#fff;font-weight:700;font-size:.85rem;letter-spacing:.16em;
+  padding:13px 30px;border-radius:12px;box-shadow:0 4px 0 var(--merah-tua);
+  transition:transform .12s,box-shadow .12s,background .2s;
+}
+.btn:hover{background:#C4182F;}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--merah-tua);}
+.btn.wide{display:block;width:100%;}
+.btn-ghost{
+  display:inline-block;background:transparent;border:2px solid var(--merah);color:var(--merah);
+  font-family:inherit;font-weight:700;font-size:.8rem;letter-spacing:.16em;
+  padding:11px 26px;border-radius:12px;cursor:pointer;transition:.15s;margin-top:12px;
+}
+.btn-ghost:hover{background:var(--merah-muda);}
+.btn-ghost.wide{display:block;width:100%;}
+
+/* ================= PANEL / INPUT ================= */
+.panel-box{
+  background:#fff;border:2px solid rgba(224,30,55,.35);border-radius:22px;
+  padding:28px 24px;text-align:center;
+}
+.field-label{display:block;font-size:.9rem;font-weight:700;margin-bottom:10px;letter-spacing:.03em;}
+.text-input{
+  width:100%;padding:13px 16px;border:2px solid rgba(224,30,55,.45);border-radius:12px;
+  font-family:inherit;font-size:1rem;background:var(--putih);color:var(--teks);outline:none;transition:.15s;
+}
+.text-input:focus{border-color:var(--merah);box-shadow:0 0 0 4px var(--merah-muda);}
+.hint-text{font-size:.72rem;color:var(--teks-lembut);line-height:1.6;margin-bottom:18px;}
+
+.mode-group{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px;}
+.mode-btn{
+  font-family:inherit;font-weight:700;font-size:.8rem;letter-spacing:.08em;cursor:pointer;
+  padding:10px 18px;border-radius:10px;border:2px solid rgba(224,30,55,.4);
+  background:#fff;color:var(--merah);transition:.15s;
+}
+.mode-btn:hover{background:var(--merah-muda);}
+.mode-btn.active{background:var(--merah);color:#fff;border-color:var(--merah);}
+
+/* ================= LOBBY ================= */
+.lobby-timer{
+  font-size:2.8rem;font-weight:800;color:var(--merah);letter-spacing:.1em;
+  margin:6px 0 20px;font-variant-numeric:tabular-nums;
+}
+.lobby-list{list-style:none;display:flex;flex-direction:column;gap:10px;margin-bottom:24px;}
+.lobby-list li{
+  display:flex;align-items:center;gap:10px;background:#fff;
+  border:2px solid rgba(224,30,55,.3);border-radius:12px;padding:13px 16px;
+  font-weight:600;font-size:.88rem;text-align:left;
+}
+.lobby-list li.empty{border-style:dashed;color:var(--teks-lembut);font-weight:500;}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--hijau);flex:0 0 auto;}
+.empty .dot{background:#DCD2C7;}
+
+/* ================= STUDY PAGE ================= */
+.study-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+@media(max-width:780px){.study-grid{grid-template-columns:1fr;}}
+.study-panel{background:#fff;border:2px solid rgba(224,30,55,.32);border-radius:20px;padding:18px;}
+.study-panel h2{
+  font-size:.85rem;letter-spacing:.18em;color:var(--merah);font-weight:800;
+  text-align:center;margin-bottom:14px;text-transform:uppercase;
+}
+.study-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(58px,1fr));gap:8px;}
+.study-item{
+  background:var(--krem);border-radius:10px;padding:8px 2px;text-align:center;
+  transition:.15s;border:1px solid transparent;
+}
+.study-item:hover{background:var(--peach);border-color:var(--merah);transform:translateY(-2px);}
+.si-kana{display:block;font-size:1.4rem;line-height:1.2;font-family:var(--jp-font);}
+.si-romaji{display:block;font-size:.62rem;color:var(--teks-lembut);letter-spacing:.05em;margin-top:2px;}
+
+/* ================= GAME PAGE ================= */
+#screen-game{max-width:1340px;margin:0 auto;padding:22px 16px 50px;}
+.game-header{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;
+}
+.gh-label{font-size:.68rem;letter-spacing:.22em;color:var(--teks-lembut);font-weight:700;}
+.btn-quit{
+  background:transparent;border:2px solid rgba(224,30,55,.45);color:var(--merah);
+  font-family:inherit;font-weight:700;font-size:.68rem;letter-spacing:.1em;
+  padding:7px 14px;border-radius:9px;cursor:pointer;transition:.15s;
+}
+.btn-quit:hover{background:var(--merah-muda);}
+
+.game-top{display:flex;flex-direction:column;align-items:center;margin-bottom:16px;}
+.question-box{
+  background:var(--krem);border:2px solid var(--merah);border-radius:20px;
+  padding:12px 44px 14px;text-align:center;min-width:270px;
+  box-shadow:0 6px 0 rgba(224,30,55,.16);transition:.2s;
+}
+.question-box.pulse{animation:qpulse .45s ease;}
+@keyframes qpulse{0%{transform:scale(.94);}60%{transform:scale(1.04);}100%{transform:scale(1);}}
+.q-label{font-size:.66rem;letter-spacing:.24em;color:var(--merah);font-weight:800;}
+.q-kana{font-size:clamp(2.2rem,7vw,3.3rem);line-height:1.15;font-weight:700;font-family:var(--jp-font);}
+.q-hint{font-size:.78rem;color:var(--teks-lembut);letter-spacing:.03em;}
+.q-hint b{color:var(--merah);}
+
+.game-body{display:grid;grid-template-columns:180px 1fr 180px;gap:14px;align-items:start;}
+@media(max-width:960px){
+  .game-body{grid-template-columns:1fr;}
+  .field{order:-1;}
+  .players{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+}
+
+/* Panel pemain */
+.player-panel{
+  background:#fff;border:2px solid rgba(224,30,55,.3);border-radius:14px;
+  padding:10px 12px;margin-bottom:10px;transition:.2s;
+}
+.player-panel.me{border-color:var(--merah);background:var(--krem);}
+.player-panel.flash-bad{animation:flashBad .5s;}
+.player-panel.flash-good{animation:flashGood .5s;}
+@keyframes flashBad{0%,100%{background:#fff;}50%{background:var(--merah-muda);}}
+@keyframes flashGood{0%,100%{background:#fff;}50%{background:#D9F2E4;}}
+.pp-name{
+  font-size:.78rem;font-weight:800;letter-spacing:.02em;margin-bottom:6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pp-tag{
+  font-size:.55rem;background:var(--merah);color:#fff;border-radius:5px;
+  padding:2px 5px;letter-spacing:.08em;vertical-align:middle;
+}
+.pp-tag.bot{background:var(--peach);color:var(--teks);}
+.pp-stats{display:flex;gap:8px;font-size:.72rem;font-weight:700;}
+.stat.ok{color:var(--hijau);}
+.stat.no{color:var(--merah);}
+.stat.sc{color:#C98A00;}
+
+/* Lapangan kartu */
+.field{
+  background:var(--putih);border:2px solid rgba(224,30,55,.35);border-radius:20px;
+  padding:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(66px,1fr));
+  gap:10px;min-height:360px;align-content:start;transition:.2s;
+}
+.field.locked{opacity:.45;filter:grayscale(.4);pointer-events:none;}
+.kana-card{
+  aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;
+  background:#fff;border:2px solid rgba(224,30,55,.3);border-radius:14px;
+  font-family:var(--jp-font);font-size:clamp(1.4rem,3.2vw,2rem);
+  cursor:pointer;user-select:none;color:var(--teks);
+  transition:transform .15s,border-color .15s,box-shadow .15s,background .2s;
+}
+.kana-card:hover{border-color:var(--merah);transform:translateY(-3px);box-shadow:0 8px 16px rgba(224,30,55,.18);}
+.kana-card.correct{background:var(--hijau);border-color:var(--hijau);color:#fff;animation:pop .35s;}
+.kana-card.wrong{animation:shake .32s;border-color:var(--merah);background:var(--merah-muda);}
+.kana-card.taken{opacity:0;transform:scale(.35) rotate(14deg);transition:.35s;}
+@keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.18);}100%{transform:scale(1);}}
+@keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
+
+/* ================= RESULT / HALL ================= */
+.rank-list{display:flex;flex-direction:column;gap:12px;margin:24px 0;}
+.rank-item{
+  display:flex;align-items:center;gap:14px;text-align:left;
+  background:#fff;border:2px solid rgba(224,30,55,.35);border-radius:14px;padding:14px 18px;
+  animation:fade .35s ease backwards;
+}
+.rank-item.top{border-color:var(--merah);background:var(--krem);}
+.rank-no{font-size:.7rem;font-weight:800;letter-spacing:.14em;color:var(--merah);min-width:58px;}
+.rank-name{font-weight:700;flex:1;font-size:.95rem;}
+.rank-name em{font-weight:400;font-size:.72rem;color:var(--teks-lembut);}
+.rank-detail{font-size:.72rem;color:var(--teks-lembut);}
+.rank-score{font-weight:800;font-size:1.2rem;color:var(--merah);min-width:44px;text-align:right;}
+.page-title{
+  font-size:1rem;letter-spacing:.28em;color:var(--merah);font-weight:800;
+  text-transform:uppercase;margin-bottom:6px;
+}
+.page-sub{font-size:.75rem;color:var(--teks-lembut);}
+.empty-state{
+  font-size:.85rem;color:var(--teks-lembut);line-height:1.8;padding:36px 10px;
+  border:2px dashed rgba(224,30,55,.3);border-radius:16px;
+}
+
+/* ================= TOAST ================= */
+.toast{
+  position:fixed;left:50%;bottom:34px;transform:translate(-50%,20px);
+  background:var(--teks);color:#fff;padding:12px 22px;border-radius:12px;
+  font-size:.82rem;font-weight:600;letter-spacing:.02em;opacity:0;
+  transition:.3s;z-index:1200;pointer-events:none;max-width:90vw;text-align:center;
+}
+.toast.show{opacity:1;transform:translate(-50%,0);}
+</style>
+</head>
+<body>
+
+<!-- ============================================================
+     1. MAIN PAGE
+     ============================================================ -->
+<section id="screen-home" class="screen active">
+  <div class="wrap">
+    <div class="brand">
+      <h1>KARUTA</h1>
+      <p>by Danz Sensei</p>
+    </div>
+
+    <div class="menu-grid">
+      <div class="menu-card">
+        <div>
+          <h2>Belajar Huruf</h2>
+          <p class="desc">Kenali dulu semua huruf Hiragana &amp; Katakana beserta cara bacanya.</p>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn" data-go="study">MULAI</button>
+      </div>
+
+      <div class="menu-card">
+        <div>
+          <h2>Play Game</h2>
+          <p class="desc">(Hiragana &amp; Katakana)<br>Lomba mengumpulkan kartu huruf terbanyak!</p>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn" data-go="regist">MULAI</button>
+      </div>
+
+      <div class="menu-card">
+        <div>
+          <h2>Hall of Fame</h2>
+          <p class="desc">Lihat riwayat &amp; skor terbaik para pemain Karuta.</p>
+        </div>
+        <div class="spacer"></div>
+        <button class="btn" data-go="hall">LIHAT</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     2. REGIST PAGE
+     ============================================================ -->
+<section id="screen-regist" class="screen">
+  <div class="center-wrap">
+    <div class="brand">
+      <h1>KARUTA</h1>
+      <p>by Danz Sensei</p>
+    </div>
+
+    <div class="panel-box">
+      <label class="field-label" for="inputName">Enter Name</label>
+      <input id="inputName" class="text-input" type="text" maxlength="16"
+             placeholder="Masukkan nama pemain..." autocomplete="off">
+
+      <div class="field-label" style="margin-top:22px;">Jumlah Pemain</div>
+      <div class="mode-group" id="modeGroup">
+        <button class="mode-btn active" data-mode="1">Solo</button>
+        <button class="mode-btn" data-mode="2">2 Pemain</button>
+        <button class="mode-btn" data-mode="3">3 Pemain</button>
+        <button class="mode-btn" data-mode="4">4 Pemain</button>
+      </div>
+      <p class="hint-text" id="modeHint"></p>
+
+      <button class="btn wide" id="btnStartGame">MULAI</button>
+      <button class="btn-ghost wide" data-go="home">KEMBALI</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     3. LOBBY PAGE (menunggu pemain)
+     ============================================================ -->
+<section id="screen-lobby" class="screen">
+  <div class="center-wrap">
+    <div class="brand">
+      <h1>KARUTA</h1>
+      <p>by Danz Sensei</p>
+    </div>
+
+    <div class="panel-box">
+      <h2 class="page-title">Menunggu Pemain</h2>
+      <p class="page-sub">Pemain lain akan dipertemukan secara real-time</p>
+      <div class="lobby-timer" id="lobbyTimer">02:00</div>
+      <ul class="lobby-list" id="lobbyList"></ul>
+      <button class="btn wide" id="btnForceStart">ISI DENGAN BOT &amp; MULAI</button>
+      <button class="btn-ghost wide" id="btnCancelLobby">BATAL</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     4. STUDY PAGE
+     ============================================================ -->
+<section id="screen-study" class="screen">
+  <div class="wrap">
+    <div class="brand">
+      <h1>KARUTA</h1>
+      <p>by Danz Sensei</p>
+    </div>
+
+    <div class="study-grid">
+      <div class="study-panel">
+        <h2>Hiragana List</h2>
+        <div class="study-list" id="hiraganaList"></div>
+      </div>
+      <div class="study-panel">
+        <h2>Katakana List</h2>
+        <div class="study-list" id="katakanaList"></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin-top:26px;">
+      <button class="btn-ghost" data-go="home">BACK</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     5. GAME PAGE
+     ============================================================ -->
+<section id="screen-game" class="screen">
+  <div class="game-header">
+    <span class="gh-label">GAME PAGE</span>
+    <div class="brand small" style="margin:0;">
+      <h1>KARUTA</h1>
+      <p>by Danz Sensei</p>
+    </div>
+    <button class="btn-quit" data-go="home">✕ KELUAR</button>
+  </div>
+
+  <div class="game-top">
+    <div class="question-box" id="questionBox">
+      <div class="q-label" id="qLabel">SOAL 1 / 12</div>
+      <div class="q-kana" id="qKana">あ</div>
+      <div class="q-hint" id="qHint">a — cari padanan KATAKANA</div>
+    </div>
+  </div>
+
+  <div class="game-body">
+    <aside class="players" id="playersLeft"></aside>
+    <main class="field" id="field"></main>
+    <aside class="players" id="playersRight"></aside>
+  </div>
+</section>
+
+<!-- ============================================================
+     6. RESULT PAGE
+     ============================================================ -->
+<section id="screen-result" class="screen">
+  <div class="center-wrap">
+    <div class="brand">
+      <h1>KARUTA</h1>
+      <p>by Danz Sensei</p>
+    </div>
+
+    <div class="panel-box">
+      <h2 class="page-title">Result</h2>
+      <p class="page-sub" id="resultSub"></p>
+      <div class="rank-list" id="resultList"></div>
+      <button class="btn wide" id="btnEnd">END</button>
+      <p class="hint-text" style="margin-top:14px;margin-bottom:0;">
+        Menekan END akan mengunduh laporan hasil permainanmu (.txt)
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     7. HALL OF FAME
+     ============================================================ -->
+<section id="screen-hall" class="screen">
+  <div class="center-wrap">
+    <div class="brand">
+      <h1>KARUTA</h1>
+      <p>by Danz Sensei</p>
+    </div>
+
+    <div class="panel-box">
+      <h2 class="page-title">Hall of Fame</h2>
+      <p class="page-sub">10 skor terbaik sepanjang masa</p>
+      <div class="rank-list" id="hallList"></div>
+      <button class="btn-ghost wide" data-go="home" style="margin-top:0;">BACK</button>
+    </div>
+  </div>
+</section>
+
+<script>
+/* =========================================================
+   BAGIAN 1 — UTILITAS
+   ========================================================= */
+const $  = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const rand    = (a, b) => Math.random() * (b - a) + a;
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const shuffle = arr => {
+  const x = [...arr];
+  for (let i = x.length - 1; i > 0; i--) {
+    const j = randInt(0, i);
+    [x[i], x[j]] = [x[j], x[i]];
+  }
+  return x;
+};
+const escapeHtml = s => String(s).replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtTanggal = d => {
+  const dt = (d instanceof Date) ? d : new Date(d);
+  return dt.toLocaleString('id-ID',
+    {day:'2-digit', month:'long', year:'numeric', hour:'2-digit', minute:'2-digit'});
+};
+const fmtTanggalPendek = d => {
+  const dt = (d instanceof Date) ? d : new Date(d);
+  return dt.toLocaleDateString('id-ID', {day:'2-digit', month:'short', year:'numeric'});
+};
+const fmtDurasi = s => {
+  s = Math.max(0, s);
+  const m = String(Math.floor(s / 60)).padStart(2, '0');
+  const d = String(s % 60).padStart(2, '0');
+  return `${m}:${d}`;
+};
+
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => {
+    t.classList.remove('show');
+    setTimeout(() => t.remove(), 320);
+  }, 2600);
+}
+
+/* =========================================================
+   BAGIAN 2 — DATA CADANGAN (fallback bila karutadb.json gagal dimuat)
+   ========================================================= */
+const KANA_CSV = `a|あ|ア|vokal
+i|い|イ|vokal
+u|う|ウ|vokal
+e|え|エ|vokal
+o|お|オ|vokal
+ka|か|カ|k
+ki|き|キ|k
+ku|く|ク|k
+ke|け|ケ|k
+ko|こ|コ|k
+sa|さ|サ|s
+shi|し|シ|s
+su|す|ス|s
+se|せ|セ|s
+so|そ|ソ|s
+ta|た|タ|t
+chi|ち|チ|t
+tsu|つ|ツ|t
+te|て|テ|t
+to|と|ト|t
+na|な|ナ|n
+ni|に|ニ|n
+nu|ぬ|ヌ|n
+ne|ね|ネ|n
+no|の|ノ|n
+ha|は|ハ|h
+hi|ひ|ヒ|h
+fu|ふ|フ|h
+he|へ|ヘ|h
+ho|ほ|ホ|h
+ma|ま|マ|m
+mi|み|ミ|m
+mu|む|ム|m
+me|め|メ|m
+mo|も|モ|m
+ya|や|ヤ|y
+yu|ゆ|ユ|y
+yo|よ|ヨ|y
+ra|ら|ラ|r
+ri|り|リ|r
+ru|る|ル|r
+re|れ|レ|r
+ro|ろ|ロ|r
+wa|わ|ワ|w
+wo|を|ヲ|w
+n|ん|ン|n-akhir`;
+
+const MATERI_DEFAULT = {
+  vokal: "Kelompok VOKAL (a, i, u, e, o). Dibaca apa adanya seperti huruf vokal bahasa Indonesia.",
+  k: "Kelompok K (ka, ki, ku, ke, ko). Dibaca 'k' + vokal.",
+  s: "Kelompok S (sa, shi, su, se, so). Perhatikan 'shi', bukan 'si'.",
+  t: "Kelompok T (ta, chi, tsu, te, to). Perhatikan 'chi' dan 'tsu'.",
+  n: "Kelompok N (na, ni, nu, ne, no). Dibaca 'n' + vokal.",
+  h: "Kelompok H (ha, hi, fu, he, ho). Perhatikan 'fu', bukan 'hu'.",
+  m: "Kelompok M (ma, mi, mu, me, mo). Dibaca 'm' + vokal.",
+  y: "Kelompok Y (ya, yu, yo). Hanya terdiri dari 3 huruf.",
+  r: "Kelompok R (ra, ri, ru, re, ro). Dibaca 'r' + vokal.",
+  w: "Kelompok W (wa, wo). 'wo' dilafalkan seperti 'o'.",
+  "n-akhir": "Huruf 'n' (ん / ン) adalah satu-satunya huruf konsonan tunggal dalam bahasa Jepang."
+};
+
+const SETTINGS_DEFAULT = {
+  jumlahSoal: 12,
+  durasiLobiDetik: 120,
+  durasiSoalDetik: 8,
+  maksimalHallOfFame: 10,
+  maksimalPemain: 4
+};
+
+function buildFallbackDB() {
+  const huruf = KANA_CSV.trim().split('\n').map((line, i) => {
+    const [romaji, hiragana, katakana, grup] = line.split('|');
+    return { id: i + 1, romaji, hiragana, katakana, grup };
+  });
+  return {
+    versi: '1.0',
+    aplikasi: 'KARUTA',
+    pembuat: 'Danz Sensei',
+    pengaturan: { ...SETTINGS_DEFAULT },
+    materi: { ...MATERI_DEFAULT },
+    huruf,
+    riwayat: []
+  };
+}
+
+/* =========================================================
+   BAGIAN 3 — STATE APLIKASI
+   ========================================================= */
+const APP = {
+  db: null,
+  settings: { ...SETTINGS_DEFAULT },
+  materi: { ...MATERI_DEFAULT },
+
+  playerName: '',
+  mode: 1,              // 1 = solo, 2/3/4 = jumlah pemain
+  totalPlayers: 4,
+  players: [],
+  started: false,
+
+  questions: [],
+  field: [],
+  qIndex: 0,
+  current: null,
+  roundWrong: [],
+  phase: 'idle',        // idle | playing | resolved | over
+
+  log: [],
+  lastResult: null,
+  history: [],
+
+  timers: [],
+  roundTimer: null,
+  lobbyInterval: null,
+  lobbyTimeLeft: 0
+};
+
+const BOT_POOL = ['Aiko', 'Kenji', 'Sakura', 'Haruto', 'Yuki', 'Ren', 'Mio', 'Takeshi'];
+let botQueue = [];
+const BOT_TAG = 'Bot AI';
+
+/* =========================================================
+   BAGIAN 4 — LOAD DATABASE (karutadb.json)
+   ========================================================= */
+async function loadDB() {
+  try {
+    const res = await fetch('karutadb.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data || !Array.isArray(data.huruf) || !data.huruf.length) {
+      throw new Error('Struktur karutadb.json tidak valid');
+    }
+    console.log('[KARUTA] Database dimuat dari karutadb.json');
+    return data;
+  } catch (err) {
+    console.warn('[KARUTA] Gagal memuat karutadb.json → memakai data bawaan.', err);
+    return buildFallbackDB();
+  }
+}
+
+/* =========================================================
+   BAGIAN 5 — HISTORI (localStorage + seed dari JSON)
+   ========================================================= */
+const HISTORY_KEY = 'karuta_history_v1';
+
+function loadHistory() {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) { /* abaikan */ }
+  return Array.isArray(APP.db.riwayat) ? [...APP.db.riwayat] : [];
+}
+
+function saveHistory() {
+  try {
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(APP.history));
+  } catch (e) {
+    console.warn('[KARUTA] Tidak bisa menyimpan riwayat ke localStorage.', e);
+  }
+}
+
+/* =========================================================
+   BAGIAN 6 — NAVIGASI SCREEN
+   ========================================================= */
+function showScreen(name) {
+  $$('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'instant' in window ? 'instant' : 'auto' });
+}
+
+/* =========================================================
+   BAGIAN 7 — STUDY PAGE
+   ========================================================= */
+function renderStudy() {
+  const h = $('#hiraganaList');
+  const k = $('#katakanaList');
+  h.innerHTML = '';
+  k.innerHTML = '';
+  APP.db.huruf.forEach(x => {
+    h.insertAdjacentHTML('beforeend',
+      `<div class="study-item">
+         <span class="si-kana">${escapeHtml(x.hiragana)}</span>
+         <span class="si-romaji">${escapeHtml(x.romaji)}</span>
+       </div>`);
+    k.insertAdjacentHTML('beforeend',
+      `<div class="study-item">
+         <span class="si-kana">${escapeHtml(x.katakana)}</span>
+         <span class="si-romaji">${escapeHtml(x.romaji)}</span>
+       </div>`);
+  });
+}
+
+/* =========================================================
+   BAGIAN 8 — REGIST PAGE
+   ========================================================= */
+function resetRegist() {
+  $('#inputName').value = APP.playerName || '';
+  updateModeHint();
+}
+
+function updateModeHint() {
+  const hint = $('#modeHint');
+  if (APP.mode === 1) {
+    hint.textContent = 'Solo: kamu akan melawan 3 Bot AI (total 4 pemain).';
+  } else {
+    hint.textContent = `Multiplayer ${APP.mode} pemain: slot yang kosong akan diisi Bot AI otomatis (maks. 2 menit).`;
+  }
+}
+
+/* =========================================================
+   BAGIAN 9 — LOBBY
+   ========================================================= */
+function startLobby() {
+  clearAllTimers();
+  APP.started = false;
+
+  const total = (APP.mode === 1) ? 4 : APP.mode;
+  APP.totalPlayers = total;
+  APP.players = [{
+    id: 0, name: APP.playerName, isBot: false,
+    correct: 0, wrong: 0, score: 0, lockedUntil: 0, skill: 1
+  }];
+
+  botQueue = shuffle(BOT_POOL);
+  APP.lobbyTimeLeft = APP.settings.durasiLobiDetik;
+
+  renderLobby();
+  updateLobbyTimer();
+  showScreen('lobby');
+
+  APP.lobbyInterval = setInterval(() => {
+    APP.lobbyTimeLeft--;
+    updateLobbyTimer();
+    if (APP.lobbyTimeLeft <= 0) {
+      fillBots();
+      renderLobby();
+      startGame();
+    }
+  }, 1000);
+
+  const slots = total - 1;
+  for (let i = 0; i < slots; i++) {
+    const t = setTimeout(() => {
+      if (APP.started) return;
+      if (APP.players.length < APP.totalPlayers) {
+        addBot();
+        renderLobby();
+        if (APP.players.length >= APP.totalPlayers) {
+          setTimeout(startGame, 800);
+        }
+      }
+    }, 2500 + i * 2300 + rand(0, 1300));
+    APP.timers.push(t);
+  }
+
+  if (slots === 0) setTimeout(startGame, 700);
+}
+
+function addBot() {
+  const name = botQueue.shift() || ('Bot ' + (APP.players.length));
+  APP.players.push({
+    id: APP.players.length, name, isBot: true,
+    correct: 0, wrong: 0, score: 0, lockedUntil: 0, skill: 0.85
+  });
+}
+
+function fillBots() {
+  while (APP.players.length < APP.totalPlayers) addBot();
+}
+
+function updateLobbyTimer() {
+  $('#lobbyTimer').textContent = fmtDurasi(APP.lobbyTimeLeft);
+}
+
+function renderLobby() {
+  const list = $('#lobbyList');
+  let html = '';
+  APP.players.forEach(p => {
+    html += `<li><span class="dot"></span>${escapeHtml(p.name)}${p.isBot ? ' <em style="font-weight:400;font-size:.72rem;color:#93806F;">(' + BOT_TAG + ')</em>' : ' <em style="font-weight:400;font-size:.72rem;color:#E01E37;">(KAMU)</em>'}</li>`;
+  });
+  for (let i = APP.players.length; i < APP.totalPlayers; i++) {
+    html += `<li class="empty"><span class="dot"></span>Menunggu pemain...</li>`;
+  }
+  list.innerHTML = html;
+}
+
+/* =========================================================
+   BAGIAN 10 — ENGINE PERMAINAN
+   ========================================================= */
+function clearAllTimers() {
+  APP.timers.forEach(t => clearTimeout(t));
+  APP.timers = [];
+  if (APP.roundTimer) { clearTimeout(APP.roundTimer); APP.roundTimer = null; }
+  if (APP.lobbyInterval) { clearInterval(APP.lobbyInterval); APP.lobbyInterval = null; }
+}
+
+function buildQuestions() {
+  const n = Math.min(APP.settings.jumlahSoal, APP.db.huruf.length);
+  const pool = shuffle(APP.db.huruf).slice(0, n);
+
+  APP.questions = pool.map(h => {
+    const tanyaHiragana = Math.random() < 0.5;
+    return {
+      romaji: h.romaji,
+      grup: h.grup,
+      hiragana: h.hiragana,
+      katakana: h.katakana,
+      soalKana: tanyaHiragana ? h.hiragana : h.katakana,
+      soalScript: tanyaHiragana ? 'Hiragana' : 'Katakana',
+      jawabKana: tanyaHiragana ? h.katakana : h.hiragana,
+      jawabScript: tanyaHiragana ? 'Katakana' : 'Hiragana'
+    };
+  });
+}
+
+function buildField() {
+  const cards = [];
+  APP.questions.forEach((q, i) => {
+    cards.push({ key: i + '-h', kana: q.hiragana, script: 'Hiragana', romaji: q.romaji, taken: false });
+    cards.push({ key: i + '-k', kana: q.katakana, script: 'Katakana', romaji: q.romaji, taken: false });
+  });
+  APP.field = shuffle(cards);
+}
+
+function startGame() {
+  if (APP.started) return;
+  APP.started = true;
+  clearAllTimers();
+  fillBots();
+
+  APP.players.forEach(p => {
+    p.correct = 0;
+    p.wrong = 0;
+    p.score = 0;
+    p.lockedUntil = 0;
+    p.skill = p.isBot ? rand(0.76, 0.92) : 1;
+  });
+
+  buildQuestions();
+  buildField();
+
+  APP.qIndex = 0;
+  APP.log = [];
+  APP.current = null;
+  APP.roundWrong = [];
+  APP.phase = 'idle';
+
+  renderGameLayout();
+  renderField();
+  showScreen('game');
+
+  setTimeout(nextRound, 800);
+}
+
+function renderGameLayout() {
+  const left = $('#playersLeft');
+  const right = $('#playersRight');
+  left.innerHTML = '';
+  right.innerHTML = '';
+
+  APP.players.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'player-panel' + (i === 0 ? ' me' : '');
+    el.id = 'panel-' + i;
+    el.innerHTML = `
+      <div class="pp-name">
+        ${escapeHtml(p.name)}
+        ${i === 0
+          ? '<span class="pp-tag">KAMU</span>'
+          : (p.isBot ? '<span class="pp-tag bot">BOT</span>' : '')}
+      </div>
+      <div class="pp-stats">
+        <span class="stat ok">✔ <b data-f="correct">0</b></span>
+        <span class="stat no">✘ <b data-f="wrong">0</b></span>
+        <span class="stat sc">★ <b data-f="score">0</b></span>
+      </div>`;
+    (i % 2 === 0 ? left : right).appendChild(el);
+  });
+}
+
+function renderField() {
+  const field = $('#field');
+  field.innerHTML = '';
+  APP.field.forEach(c => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'kana-card';
+    btn.dataset.key = c.key;
+    btn.textContent = c.kana;
+    btn.addEventListener('click', () => onCardClick(c, btn));
+    field.appendChild(btn);
+  });
+}
+
+function updatePanels() {
+  APP.players.forEach((p, i) => {
+    const el = document.getElementById('panel-' + i);
+    if (!el) return;
+    el.querySelector('[data-f="correct"]').textContent = p.correct;
+    el.querySelector('[data-f="wrong"]').textContent = p.wrong;
+    el.querySelector('[data-f="score"]').textContent = p.score;
+  });
+}
+
+function flashPanel(idx, good) {
+  const el = document.getElementById('panel-' + idx);
+  if (!el) return;
+  const cls = good ? 'flash-good' : 'flash-bad';
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 520);
+}
+
+/* ---------------- RONDE ---------------- */
+function nextRound() {
+  if (APP.qIndex >= APP.questions.length) {
+    endGame();
+    return;
+  }
+
+  APP.current = APP.questions[APP.qIndex];
+  APP.roundWrong = [];
+  APP.phase = 'playing';
+
+  APP.players.forEach(p => { p.lockedUntil = 0; });
+
+  renderQuestion();
+  updatePanels();
+
+  const qb = $('#questionBox');
+  qb.classList.remove('pulse');
+  void qb.offsetWidth;
+  qb.classList.add('pulse');
+
+  // Bot AI mulai berpikir
+  APP.players.forEach(p => { if (p.isBot) scheduleBot(p, 0); });
+
+  // Batas waktu soal
+  APP.roundTimer = setTimeout(() => {
+    if (APP.phase === 'playing') endRoundNoWinner();
+  }, APP.settings.durasiSoalDetik * 1000);
+}
+
+function renderQuestion() {
+  const q = APP.current;
+  $('#qLabel').textContent = `SOAL ${APP.qIndex + 1} / ${APP.questions.length}`;
+  $('#qKana').textContent = q.soalKana;
+  $('#qHint').innerHTML =
+    `<b>${escapeHtml(q.romaji)}</b> &middot; cari padanan <b>${q.jawabScript.toUpperCase()}</b>`;
+}
+
+/* ---------------- BOT AI (tingkat kepintaran sedang) ---------------- */
+function scheduleBot(bot, attempt) {
+  const base = attempt === 0 ? rand(1000, 2500) : rand(700, 1500);
+  const penalty = (1 - bot.skill) * 2200;
+  const delay = base + penalty;
+
+  const t = setTimeout(() => {
+    if (APP.phase !== 'playing') return;
+
+    const correctCard = APP.field.find(c => !c.taken && c.kana === APP.current.jawabKana);
+    if (!correctCard) return;
+
+    const accuracy = Math.min(0.97, bot.skill + (attempt > 0 ? 0.12 : 0));
+    const willBeRight = Math.random() < accuracy;
+
+    if (willBeRight) {
+      botPick(bot, correctCard);
+    } else {
+      const wrongs = APP.field.filter(c => !c.taken && c.kana !== APP.current.jawabKana);
+      if (wrongs.length) {
+        botPick(bot, wrongs[randInt(0, wrongs.length - 1)]);
+      } else {
+        botPick(bot, correctCard);
+      }
+    }
+  }, delay);
+
+  APP.timers.push(t);
+}
+
+function botPick(bot, card) {
+  if (APP.phase !== 'playing') return;
+  const el = document.querySelector(`.kana-card[data-key="${card.key}"]`);
+
+  if (card.kana === APP.current.jawabKana) {
+    resolveRound(bot, card, el);
+    return;
+  }
+
+  // Bot salah ambil kartu
+  bot.wrong++;
+  APP.roundWrong.push({ player: bot.name, picked: card.kana, pickedScript: card.script });
+  if (el) {
+    el.classList.add('wrong');
+    setTimeout(() => el.classList.remove('wrong'), 340);
+  }
+  updatePanels();
+  scheduleBot(bot, 1);
+}
+
+/* ---------------- AKSI PEMAIN MANUSIA ---------------- */
+function onCardClick(card, el) {
+  if (APP.phase !== 'playing') return;
+  if (card.taken) return;
+
+  const me = APP.players[0];
+  if (Date.now() < me.lockedUntil) return;
+
+  if (card.kana === APP.current.jawabKana) {
+    resolveRound(me, card, el);
+    return;
+  }
+
+  // Salah
+  me.wrong++;
+  me.lockedUntil = Date.now() + 1100;
+  APP.roundWrong.push({ player: me.name, picked: card.kana, pickedScript: card.script });
+
+  el.classList.add('wrong');
+  setTimeout(() => el.classList.remove('wrong'), 340);
+
+  const field = $('#field');
+  field.classList.add('locked');
+  setTimeout(() => field.classList.remove('locked'), 1100);
+
+  updatePanels();
+  flashPanel(0, false);
+}
+
+/* ---------------- PENYELESAIAN RONDE ---------------- */
+function resolveRound(winner, card, el) {
+  APP.phase = 'resolved';
+  clearAllTimers();
+
+  card.taken = true;
+  if (el) {
+    el.classList.add('correct');
+    setTimeout(() => {
+      el.classList.add('taken');
+      setTimeout(() => el.remove(), 360);
+    }, 190);
+  }
+
+  winner.correct++;
+  winner.score++;
+
+  const idx = APP.players.indexOf(winner);
+  flashPanel(idx, true);
+
+  APP.log.push({
+    no: APP.qIndex + 1,
+    soalKana: APP.current.soalKana,
+    soalScript: APP.current.soalScript,
+    jawabKana: APP.current.jawabKana,
+    jawabScript: APP.current.jawabScript,
+    romaji: APP.current.romaji,
+    grup: APP.current.grup,
+    hiragana: APP.current.hiragana,
+    katakana: APP.current.katakana,
+    pemenang: winner.name,
+    salah: [...APP.roundWrong]
+  });
+
+  updatePanels();
+  APP.qIndex++;
+  setTimeout(nextRound, 950);
+}
+
+function endRoundNoWinner() {
+  APP.phase = 'resolved';
+  clearAllTimers();
+
+  APP.log.push({
+    no: APP.qIndex + 1,
+    soalKana: APP.current.soalKana,
+    soalScript: APP.current.soalScript,
+    jawabKana: APP.current.jawabKana,
+    jawabScript: APP.current.jawabScript,
+    romaji: APP.current.romaji,
+    grup: APP.current.grup,
+    hiragana: APP.current.hiragana,
+    katakana: APP.current.katakana,
+    pemenang: '—',
+    salah: [...APP.roundWrong]
+  });
+
+  APP.qIndex++;
+  setTimeout(nextRound, 700);
+}
+
+/* =========================================================
+   BAGIAN 11 — AKHIR PERMAINAN & RESULT
+   ========================================================= */
+function sortPlayers(list) {
+  return [...list].sort((a, b) =>
+    (b.score - a.score) || (b.correct - a.correct) || (a.wrong - b.wrong));
+}
+
+function endGame() {
+  APP.phase = 'over';
+  clearAllTimers();
+
+  const now = new Date();
+  APP.lastResult = {
+    tanggal: now,
+    totalSoal: APP.questions.length,
+    totalPemain: APP.players.length,
+    log: [...APP.log]
+  };
+
+  // Simpan ke database histori (Hall of Fame)
+  APP.players.forEach(p => {
+    APP.history.push({
+      nama: p.name,
+      skor: p.score,
+      benar: p.correct,
+      salah: p.wrong,
+      bot: !!p.isBot,
+      tanggal: now.toISOString()
+    });
+  });
+  if (APP.history.length > 300) APP.history = APP.history.slice(-300);
+  saveHistory();
+
+  renderResult();
+  showScreen('result');
+}
+
+function renderResult() {
+  const sorted = sortPlayers(APP.players);
+  $('#resultSub').textContent =
+    `${APP.questions.length} kartu diperebutkan · ${APP.players.length} pemain`;
+
+  $('#resultList').innerHTML = sorted.map((p, i) => `
+    <div class="rank-item ${i === 0 ? 'top' : ''}" style="animation-delay:${i * 70}ms">
+      <span class="rank-no">RANK ${i + 1}</span>
+      <span class="rank-name">${escapeHtml(p.name)}${p.isBot ? ' <em>(Bot)</em>' : ' <em>(Kamu)</em>'}</span>
+      <span class="rank-detail">✔ ${p.correct} · ✘ ${p.wrong}</span>
+      <span class="rank-score">${p.score}</span>
+    </div>`).join('');
+}
+
+/* =========================================================
+   BAGIAN 12 — UNDUH LAPORAN
+   ========================================================= */
+function materiText(grup) {
+  return APP.materi[grup] || 'Pelajari kembali pasangan huruf Hiragana dan Katakana ini.';
+}
+
+function buildReport() {
+  const me = APP.players[0];
+  const r = APP.lastResult;
+  const sorted = sortPlayers(APP.players);
+  const L = [];
+
+  const line = '='.repeat(52);
+  const dash = '-'.repeat(52);
+
+  L.push(line);
+  L.push('            LAPORAN HASIL PERMAINAN KARUTA');
+  L.push('                  by Danz Sensei');
+  L.push(line);
+  L.push('');
+  L.push(`Nama Pemain   : ${me.name}`);
+  L.push(`Tanggal       : ${fmtTanggal(r.tanggal)}`);
+  L.push(`Jumlah Soal   : ${r.totalSoal}`);
+  L.push(`Jumlah Pemain : ${r.totalPemain}`);
+  L.push('');
+  L.push(dash);
+  L.push('  KLASEMEN AKHIR');
+  L.push(dash);
+  sorted.forEach((p, i) => {
+    L.push(`  ${String(i + 1).padStart(2)}. ${p.name}${p.isBot ? ' [Bot AI]' : ' [Kamu]'}` +
+           `  ->  Benar: ${p.correct} | Salah: ${p.wrong} | Skor: ${p.score}`);
+  });
+  L.push('');
+  L.push(dash);
+  L.push('  RINGKASAN HASIL KAMU');
+  L.push(dash);
+  L.push(`  Kartu berhasil ditebak (benar) : ${me.correct}`);
+  L.push(`  Kartu gagal ditebak (salah)    : ${me.wrong}`);
+  L.push(`  Total Skor                     : ${me.score}`);
+  L.push('');
+
+  // Rincian kesalahan + koreksi materi singkat
+  const myMistakes = [];
+  r.log.forEach(l => {
+    l.salah.filter(s => s.player === me.name).forEach(s => {
+      myMistakes.push({
+        no: l.no,
+        soalKana: l.soalKana,
+        soalScript: l.soalScript,
+        jawabKana: l.jawabKana,
+        jawabScript: l.jawabScript,
+        romaji: l.romaji,
+        grup: l.grup,
+        hiragana: l.hiragana,
+        katakana: l.katakana,
+        picked: s.picked,
+        pickedScript: s.pickedScript
+      });
+    });
+  });
+
+  L.push(dash);
+  L.push('  DETAIL KARTU YANG GAGAL DITEBAB & KOREKSINYA');
+  L.push(dash);
+  if (!myMistakes.length) {
+    L.push('  Luar biasa! Tidak ada kartu yang salah kamu ambil. 🎉');
+    L.push('');
+  } else {
+    myMistakes.forEach(m => {
+      L.push('');
+      L.push(`  Soal #${m.no}`);
+      L.push(`    Soal          : ${m.soalKana}  (${m.soalScript})`);
+      L.push(`    Bacaan        : ${m.romaji}`);
+      L.push(`    Jawaban benar : ${m.jawabKana}  (${m.jawabScript})`);
+      L.push(`    Jawabanmu     : ${m.picked}  (${m.pickedScript})   [SALAH]`);
+      L.push(`    Materi singkat: Huruf "${m.romaji}" termasuk ${materiText(m.grup)}`);
+      L.push(`                    Pasangan hurufnya -> Hiragana: ${m.hiragana}  |  Katakana: ${m.katakana}`);
+    });
+    L.push('');
+  }
+
+  L.push(dash);
+  L.push('  REKAP SELURUH SOAL');
+  L.push(dash);
+  r.log.forEach(l => {
+    const pemenang = l.pemenang === '—' ? 'tidak ada yang menjawab' : `dimenangkan oleh ${l.pemenang}`;
+    L.push(`  #${String(l.no).padStart(2)}  ${l.soalKana} (${l.soalScript}) -> ${l.jawabKana} (${l.jawabScript})` +
+           `   [${pemenang}]`);
+  });
+  L.push('');
+  L.push(line);
+  L.push('  Terima kasih sudah bermain KARUTA!');
+  L.push('  Terus berlatih Hiragana & Katakana ya! 頑張って!');
+  L.push(line);
+
+  return L.join('\n');
+}
+
+function downloadReport() {
+  const me = APP.players[0];
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}` +
+                `-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+  const namaFile = `Karuta_Hasil_${(me.name || 'Pemain').replace(/[^a-zA-Z0-9_-]/g, '')}_${stamp}.txt`;
+
+  const blob = new Blob([buildReport()], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = namaFile;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+  toast('Laporan berhasil diunduh!');
+}
+
+/* =========================================================
+   BAGIAN 13 — HALL OF FAME
+   ========================================================= */
+function renderHall() {
+  const max = APP.settings.maksimalHallOfFame || 10;
+  const list = [...APP.history]
+    .sort((a, b) => (b.skor - a.skor) || (new Date(b.tanggal) - new Date(a.tanggal)))
+    .slice(0, max);
+
+  const box = $('#hallList');
+
+  if (!list.length) {
+    box.innerHTML = `<p class="empty-state">
+        Belum ada riwayat permainan.<br>Mainkan dulu game-nya ya! 🎴
+      </p>`;
+    return;
+  }
+
+  box.innerHTML = list.map((h, i) => `
+    <div class="rank-item ${i === 0 ? 'top' : ''}" style="animation-delay:${i * 60}ms">
+      <span class="rank-no">#${i + 1}</span>
+      <span class="rank-name">${escapeHtml(h.nama)}${h.bot ? ' <em>(Bot)</em>' : ''}</span>
+      <span class="rank-detail">✔ ${h.benar} · ✘ ${h.salah} · ${fmtTanggalPendek(h.tanggal)}</span>
+      <span class="rank-score">${h.skor}</span>
+    </div>`).join('');
+}
+
+/* =========================================================
+   BAGIAN 14 — EVENT BINDING & INISIALISASI
+   ========================================================= */
+function bindEvents() {
+  // Navigasi generik
+  document.addEventListener('click', e => {
+    const go = e.target.closest('[data-go]');
+    if (!go) return;
+    const dest = go.dataset.go;
+
+    if (dest === 'study') {
+      showScreen('study');
+    } else if (dest === 'regist') {
+      resetRegist();
+      showScreen('regist');
+    } else if (dest === 'hall') {
+      renderHall();
+      showScreen('hall');
+    } else if (dest === 'home') {
+      clearAllTimers();
+      APP.phase = 'idle';
+      APP.started = false;
+      showScreen('home');
+    }
+  });
+
+  // Pilih mode pemain
+  $('#modeGroup').addEventListener('click', e => {
+    const btn = e.target.closest('.mode-btn');
+    if (!btn) return;
+    $$('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    APP.mode = parseInt(btn.dataset.mode, 10);
+    updateModeHint();
+  });
+
+  // Mulai game dari Regist Page
+  $('#btnStartGame').addEventListener('click', () => {
+    const name = $('#inputName').value.trim();
+    if (!name) {
+      toast('Nama pemain tidak boleh kosong!');
+      $('#inputName').focus();
+      return;
+    }
+    APP.playerName = name.slice(0, 16);
+    startLobby();
+  });
+
+  $('#inputName').addEventListener('keydown', e => {
+    if (e.key === 'Enter') $('#btnStartGame').click();
+  });
+
+  // Lobby
+  $('#btnForceStart').addEventListener('click', () => {
+    fillBots();
+    renderLobby();
+    startGame();
+  });
+
+  $('#btnCancelLobby').addEventListener('click', () => {
+    clearAllTimers();
+    APP.started = false;
+    showScreen('regist');
+  });
+
+  // Result
+  $('#btnEnd').addEventListener('click', () => {
+    downloadReport();
+    setTimeout(() => {
+      clearAllTimers();
+      APP.started = false;
+      APP.phase = 'idle';
+      showScreen('home');
+    }, 900);
+  });
+}
+
+async function init() {
+  APP.db = await loadDB();
+  APP.settings = { ...SETTINGS_DEFAULT, ...(APP.db.pengaturan || {}) };
+  APP.materi = { ...MATERI_DEFAULT, ...(APP.db.materi || {}) };
+  APP.history = loadHistory();
+
+  bindEvents();
+  renderStudy();
+  updateModeHint();
+  showScreen('home');
+
+  console.log('[KARUTA] Aplikasi siap. Total huruf:', APP.db.huruf.length);
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
