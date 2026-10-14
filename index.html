@@ -214,26 +214,7 @@ body::before{
 .kana-card.correct{background:var(--hijau);border-color:var(--hijau);color:#fff;animation:pop .35s;}
 .kana-card.wrong{animation:shake .32s;border-color:var(--merah);background:var(--merah-muda);}
 .kana-card.taken{opacity:0;transform:scale(.35) rotate(14deg);transition:.35s;}
-   /* Kartu yang sedang menjadi SOAL — tidak bisa diklik */
-.kana-card.is-question{
-  position: relative;
-  background: var(--krem);
-  border: 2px dashed var(--merah);
-  color: var(--teks-lembut);
-  opacity: .55;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-.kana-card.is-question::after{
-  content: 'SOAL';
-  position: absolute;
-  top: 5px; left: 50%;
-  transform: translateX(-50%);
-  font-size: .48rem;
-  letter-spacing: .12em;
-  color: var(--merah);
-  font-weight: 800;
-}
+
 @keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.18);}100%{transform:scale(1);}}
 @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
 
@@ -814,15 +795,19 @@ function buildQuestions() {
 
   APP.questions = pool.map(h => {
     const tanyaHiragana = Math.random() < 0.5;
+    const soalKana   = tanyaHiragana ? h.hiragana : h.katakana;
+    const soalScript = tanyaHiragana ? 'Hiragana' : 'Katakana';
+
     return {
-      romaji: h.romaji,
-      grup: h.grup,
-      hiragana: h.hiragana,
-      katakana: h.katakana,
-      soalKana: tanyaHiragana ? h.hiragana : h.katakana,
-      soalScript: tanyaHiragana ? 'Hiragana' : 'Katakana',
-      jawabKana: tanyaHiragana ? h.katakana : h.hiragana,
-      jawabScript: tanyaHiragana ? 'Katakana' : 'Hiragana'
+      romaji:     h.romaji,
+      grup:       h.grup,
+      hiragana:   h.hiragana,
+      katakana:   h.katakana,
+      soalKana:   soalKana,
+      soalScript: soalScript,
+      // ✅ FIX: jawaban = huruf yang SAMA dengan soal (same-script)
+      jawabKana:   soalKana,
+      jawabScript: soalScript
     };
   });
 }
@@ -908,16 +893,6 @@ function renderField() {
   });
 }
 
-/* Tandai kartu yang SAMA PERSIS dengan soal — agar tidak bisa diklik */
-function markQuestionInField() {
-  $$('.kana-card.is-question').forEach(el => el.classList.remove('is-question'));
-  if (!APP.current) return;
-  const qCard = APP.field.find(c => !c.taken && c.kana === APP.current.soalKana);
-  if (!qCard) return;
-  const el = document.querySelector(`.kana-card[data-key="${qCard.key}"]`);
-  if (el) el.classList.add('is-question');
-}
-
 function updatePanels() {
   APP.players.forEach((p, i) => {
     const el = document.getElementById('panel-' + i);
@@ -950,7 +925,6 @@ function nextRound() {
   APP.players.forEach(p => { p.lockedUntil = 0; });
 
   renderQuestion();
-   markQuestionInField();        // ← TAMBAHKAN BARIS INI
   updatePanels();
 
   const qb = $('#questionBox');
@@ -958,10 +932,8 @@ function nextRound() {
   void qb.offsetWidth;
   qb.classList.add('pulse');
 
-  // Bot AI mulai berpikir
   APP.players.forEach(p => { if (p.isBot) scheduleBot(p, 0); });
 
-  // Batas waktu soal
   APP.roundTimer = setTimeout(() => {
     if (APP.phase === 'playing') endRoundNoWinner();
   }, APP.settings.durasiSoalDetik * 1000);
@@ -972,7 +944,7 @@ function renderQuestion() {
   $('#qLabel').textContent = `SOAL ${APP.qIndex + 1} / ${APP.questions.length}`;
   $('#qKana').textContent = q.soalKana;
   $('#qHint').innerHTML =
-    `<b>${escapeHtml(q.romaji)}</b> &middot; cari padanan <b>${q.jawabScript.toUpperCase()}</b>`;
+    `<b>${escapeHtml(q.romaji)}</b> (${q.soalScript}) &middot; klik huruf yang <b>sama</b> di lapangan`;
 }
 
 /* ---------------- BOT AI (TINGKAT PEMULA) ---------------- */
@@ -995,8 +967,9 @@ function scheduleBot(bot, attempt) {
     if (willBeRight) {
       botPick(bot, correctCard);
     } else {
-      const wrongs = APP.field.filter(c => !c.taken && c.kana !== APP.current.jawabKana &&
-  c.kana !== APP.current.soalKana);
+     const wrongs = APP.field.filter(c =>
+  !c.taken && c.kana !== APP.current.jawabKana
+);
       if (wrongs.length) {
         // Bot pemula cenderung memilih kartu acak (bukan yang mirip)
         botPick(bot, wrongs[randInt(0, wrongs.length - 1)]);
@@ -1033,9 +1006,6 @@ function botPick(bot, card) {
 function onCardClick(card, el) {
   if (APP.phase !== 'playing') return;
   if (card.taken) return;
-  // Jangan hitung salah jika kartu yang diklik sama dengan soal
-  if (el && el.classList.contains('is-question')) return;
-  if (card.kana === APP.current.soalKana) return;
 
   const me = APP.players[0];
   if (Date.now() < me.lockedUntil) return;
@@ -1044,8 +1014,6 @@ function onCardClick(card, el) {
     resolveRound(me, card, el);
     return;
   }
-  // ... sisanya sama
-}
 
   // Salah
   me.wrong++;
