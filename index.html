@@ -214,7 +214,6 @@ body::before{
 .kana-card.correct{background:var(--hijau);border-color:var(--hijau);color:#fff;animation:pop .35s;}
 .kana-card.wrong{animation:shake .32s;border-color:var(--merah);background:var(--merah-muda);}
 .kana-card.taken{opacity:0;transform:scale(.35) rotate(14deg);transition:.35s;}
-
 @keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.18);}100%{transform:scale(1);}}
 @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
 
@@ -548,7 +547,7 @@ const MATERI_DEFAULT = {
   y: "Kelompok Y (ya, yu, yo). Hanya terdiri dari 3 huruf.",
   r: "Kelompok R (ra, ri, ru, re, ro). Dibaca 'r' + vokal.",
   w: "Kelompok W (wa, wo). 'wo' dilafalkan seperti 'o'.",
-  "n-akhir": "konsonan tunggal (bukan konsonan + vokal) dan satu-satunya huruf konsonan mandiri dalam bahasa Jepang. Dilafalkan 'n'.",
+  "n-akhir": "Huruf 'n' (ん / ン) adalah satu-satunya huruf konsonan tunggal dalam bahasa Jepang."
 };
 
 const SETTINGS_DEFAULT = {
@@ -795,19 +794,15 @@ function buildQuestions() {
 
   APP.questions = pool.map(h => {
     const tanyaHiragana = Math.random() < 0.5;
-    const soalKana   = tanyaHiragana ? h.hiragana : h.katakana;
-    const soalScript = tanyaHiragana ? 'Hiragana' : 'Katakana';
-
     return {
-      romaji:     h.romaji,
-      grup:       h.grup,
-      hiragana:   h.hiragana,
-      katakana:   h.katakana,
-      soalKana:   soalKana,
-      soalScript: soalScript,
-      // ✅ FIX: jawaban = huruf yang SAMA dengan soal (same-script)
-      jawabKana:   soalKana,
-      jawabScript: soalScript
+      romaji: h.romaji,
+      grup: h.grup,
+      hiragana: h.hiragana,
+      katakana: h.katakana,
+      soalKana: tanyaHiragana ? h.hiragana : h.katakana,
+      soalScript: tanyaHiragana ? 'Hiragana' : 'Katakana',
+      jawabKana: tanyaHiragana ? h.katakana : h.hiragana,
+      jawabScript: tanyaHiragana ? 'Katakana' : 'Hiragana'
     };
   });
 }
@@ -828,13 +823,12 @@ function startGame() {
   fillBots();
 
   APP.players.forEach(p => {
-  p.correct = 0;
-  p.wrong = 0;
-  p.score = 0;
-  p.lockedUntil = 0;
-  // Bot Pemula: akurasi rendah (35%–55%)
-  p.skill = p.isBot ? rand(0.20, 0.30) : 1;
-});
+    p.correct = 0;
+    p.wrong = 0;
+    p.score = 0;
+    p.lockedUntil = 0;
+    p.skill = p.isBot ? rand(0.76, 0.92) : 1;
+  });
 
   buildQuestions();
   buildField();
@@ -882,7 +876,6 @@ function renderField() {
   const field = $('#field');
   field.innerHTML = '';
   APP.field.forEach(c => {
-    if (c.taken) return;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'kana-card';
@@ -932,8 +925,10 @@ function nextRound() {
   void qb.offsetWidth;
   qb.classList.add('pulse');
 
+  // Bot AI mulai berpikir
   APP.players.forEach(p => { if (p.isBot) scheduleBot(p, 0); });
 
+  // Batas waktu soal
   APP.roundTimer = setTimeout(() => {
     if (APP.phase === 'playing') endRoundNoWinner();
   }, APP.settings.durasiSoalDetik * 1000);
@@ -944,14 +939,13 @@ function renderQuestion() {
   $('#qLabel').textContent = `SOAL ${APP.qIndex + 1} / ${APP.questions.length}`;
   $('#qKana').textContent = q.soalKana;
   $('#qHint').innerHTML =
-    `<b>${escapeHtml(q.romaji)}</b> (${q.soalScript}) &middot; klik huruf yang <b>sama</b> di lapangan`;
+    `<b>${escapeHtml(q.romaji)}</b> &middot; cari padanan <b>${q.jawabScript.toUpperCase()}</b>`;
 }
 
-/* ---------------- BOT AI (TINGKAT PEMULA) ---------------- */
+/* ---------------- BOT AI (tingkat kepintaran sedang) ---------------- */
 function scheduleBot(bot, attempt) {
-  // Bot pemula bereaksi lambat: 2,5 – 5 detik (percobaan pertama)
-  const base = attempt === 0 ? rand(2500, 5000) : rand(1800, 3200);
-  const penalty = (1 - bot.skill) * 3500;      // penalti lebih besar → makin lambat
+  const base = attempt === 0 ? rand(1000, 2500) : rand(700, 1500);
+  const penalty = (1 - bot.skill) * 2200;
   const delay = base + penalty;
 
   const t = setTimeout(() => {
@@ -960,18 +954,14 @@ function scheduleBot(bot, attempt) {
     const correctCard = APP.field.find(c => !c.taken && c.kana === APP.current.jawabKana);
     if (!correctCard) return;
 
-    // Bonus belajar kecil saat percobaan kedua (tetap rendah untuk pemula)
-    const accuracy = Math.min(0.70, bot.skill + (attempt > 0 ? 0.08 : 0));
+    const accuracy = Math.min(0.97, bot.skill + (attempt > 0 ? 0.12 : 0));
     const willBeRight = Math.random() < accuracy;
 
     if (willBeRight) {
       botPick(bot, correctCard);
     } else {
-     const wrongs = APP.field.filter(c =>
-  !c.taken && c.kana !== APP.current.jawabKana
-);
+      const wrongs = APP.field.filter(c => !c.taken && c.kana !== APP.current.jawabKana);
       if (wrongs.length) {
-        // Bot pemula cenderung memilih kartu acak (bukan yang mirip)
         botPick(bot, wrongs[randInt(0, wrongs.length - 1)]);
       } else {
         botPick(bot, correctCard);
@@ -991,7 +981,7 @@ function botPick(bot, card) {
     return;
   }
 
-  // Bot salah ambil kartu → tetap bisa mencoba lagi, tapi lambat
+  // Bot salah ambil kartu
   bot.wrong++;
   APP.roundWrong.push({ player: bot.name, picked: card.kana, pickedScript: card.script });
   if (el) {
@@ -1186,13 +1176,11 @@ function buildReport() {
   L.push(`  Total Skor                     : ${me.score}`);
   L.push('');
 
-  // ---- Kelompokkan kesalahan per SOAL (bukan per klik) ----
-const mistakesBySoal = new Map();
-r.log.forEach(l => {
-  const myWrongs = l.salah.filter(s => s.player === me.name);
-  if (myWrongs.length > 0) {
-    if (!mistakesBySoal.has(l.no)) {
-      mistakesBySoal.set(l.no, {
+  // Rincian kesalahan + koreksi materi singkat
+  const myMistakes = [];
+  r.log.forEach(l => {
+    l.salah.filter(s => s.player === me.name).forEach(s => {
+      myMistakes.push({
         no: l.no,
         soalKana: l.soalKana,
         soalScript: l.soalScript,
@@ -1202,48 +1190,31 @@ r.log.forEach(l => {
         grup: l.grup,
         hiragana: l.hiragana,
         katakana: l.katakana,
-        wrongPicks: []
+        picked: s.picked,
+        pickedScript: s.pickedScript
       });
-    }
-    const entry = mistakesBySoal.get(l.no);
-    myWrongs.forEach(s => {
-      entry.wrongPicks.push({ kana: s.picked, script: s.pickedScript });
     });
-  }
-});
+  });
 
-L.push(dash);
-L.push('  DETAIL KARTU YANG GAGAL DITEBAB & KOREKSINYA');
-L.push(dash);
-
-if (mistakesBySoal.size === 0) {
-  L.push('  Luar biasa! Tidak ada kartu yang salah kamu ambil. 🎉');
-  L.push('');
-} else {
-  Array.from(mistakesBySoal.values())
-    .sort((a, b) => a.no - b.no)
-    .forEach(m => {
+  L.push(dash);
+  L.push('  DETAIL KARTU YANG GAGAL DITEBAB & KOREKSINYA');
+  L.push(dash);
+  if (!myMistakes.length) {
+    L.push('  Luar biasa! Tidak ada kartu yang salah kamu ambil. 🎉');
+    L.push('');
+  } else {
+    myMistakes.forEach(m => {
       L.push('');
       L.push(`  Soal #${m.no}`);
       L.push(`    Soal          : ${m.soalKana}  (${m.soalScript})`);
       L.push(`    Bacaan        : ${m.romaji}`);
       L.push(`    Jawaban benar : ${m.jawabKana}  (${m.jawabScript})`);
-
-      if (m.wrongPicks.length === 1) {
-        L.push(`    Jawabanmu     : ${m.wrongPicks[0].kana}  (${m.wrongPicks[0].script})   [SALAH]`);
-      } else {
-        L.push(`    Jawabanmu     :`);
-        m.wrongPicks.forEach(w => {
-          L.push(`                    - ${w.kana}  (${w.script})   [SALAH]`);
-        });
-        L.push(`    Total salah   : ${m.wrongPicks.length}× percobaan`);
-      }
-
+      L.push(`    Jawabanmu     : ${m.picked}  (${m.pickedScript})   [SALAH]`);
       L.push(`    Materi singkat: Huruf "${m.romaji}" termasuk ${materiText(m.grup)}`);
       L.push(`                    Pasangan hurufnya -> Hiragana: ${m.hiragana}  |  Katakana: ${m.katakana}`);
     });
-  L.push('');
-}
+    L.push('');
+  }
 
   L.push(dash);
   L.push('  REKAP SELURUH SOAL');
