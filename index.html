@@ -214,6 +214,26 @@ body::before{
 .kana-card.correct{background:var(--hijau);border-color:var(--hijau);color:#fff;animation:pop .35s;}
 .kana-card.wrong{animation:shake .32s;border-color:var(--merah);background:var(--merah-muda);}
 .kana-card.taken{opacity:0;transform:scale(.35) rotate(14deg);transition:.35s;}
+   /* Kartu yang sedang menjadi SOAL — tidak bisa diklik */
+.kana-card.is-question{
+  position: relative;
+  background: var(--krem);
+  border: 2px dashed var(--merah);
+  color: var(--teks-lembut);
+  opacity: .55;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.kana-card.is-question::after{
+  content: 'SOAL';
+  position: absolute;
+  top: 5px; left: 50%;
+  transform: translateX(-50%);
+  font-size: .48rem;
+  letter-spacing: .12em;
+  color: var(--merah);
+  font-weight: 800;
+}
 @keyframes pop{0%{transform:scale(1);}50%{transform:scale(1.18);}100%{transform:scale(1);}}
 @keyframes shake{0%,100%{transform:translateX(0);}25%{transform:translateX(-6px);}75%{transform:translateX(6px);}}
 
@@ -547,7 +567,7 @@ const MATERI_DEFAULT = {
   y: "Kelompok Y (ya, yu, yo). Hanya terdiri dari 3 huruf.",
   r: "Kelompok R (ra, ri, ru, re, ro). Dibaca 'r' + vokal.",
   w: "Kelompok W (wa, wo). 'wo' dilafalkan seperti 'o'.",
-  "n-akhir": "Huruf 'n' (ん / ン) adalah satu-satunya huruf konsonan tunggal dalam bahasa Jepang."
+  "n-akhir": "konsonan tunggal (bukan konsonan + vokal) dan satu-satunya huruf konsonan mandiri dalam bahasa Jepang. Dilafalkan 'n'.",
 };
 
 const SETTINGS_DEFAULT = {
@@ -877,6 +897,7 @@ function renderField() {
   const field = $('#field');
   field.innerHTML = '';
   APP.field.forEach(c => {
+    if (c.taken) return;
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'kana-card';
@@ -885,6 +906,16 @@ function renderField() {
     btn.addEventListener('click', () => onCardClick(c, btn));
     field.appendChild(btn);
   });
+}
+
+/* Tandai kartu yang SAMA PERSIS dengan soal — agar tidak bisa diklik */
+function markQuestionInField() {
+  $$('.kana-card.is-question').forEach(el => el.classList.remove('is-question'));
+  if (!APP.current) return;
+  const qCard = APP.field.find(c => !c.taken && c.kana === APP.current.soalKana);
+  if (!qCard) return;
+  const el = document.querySelector(`.kana-card[data-key="${qCard.key}"]`);
+  if (el) el.classList.add('is-question');
 }
 
 function updatePanels() {
@@ -919,6 +950,7 @@ function nextRound() {
   APP.players.forEach(p => { p.lockedUntil = 0; });
 
   renderQuestion();
+   markQuestionInField();        // ← TAMBAHKAN BARIS INI
   updatePanels();
 
   const qb = $('#questionBox');
@@ -963,7 +995,8 @@ function scheduleBot(bot, attempt) {
     if (willBeRight) {
       botPick(bot, correctCard);
     } else {
-      const wrongs = APP.field.filter(c => !c.taken && c.kana !== APP.current.jawabKana);
+      const wrongs = APP.field.filter(c => !c.taken && c.kana !== APP.current.jawabKana &&
+  c.kana !== APP.current.soalKana);
       if (wrongs.length) {
         // Bot pemula cenderung memilih kartu acak (bukan yang mirip)
         botPick(bot, wrongs[randInt(0, wrongs.length - 1)]);
@@ -1000,6 +1033,9 @@ function botPick(bot, card) {
 function onCardClick(card, el) {
   if (APP.phase !== 'playing') return;
   if (card.taken) return;
+  // Jangan hitung salah jika kartu yang diklik sama dengan soal
+  if (el && el.classList.contains('is-question')) return;
+  if (card.kana === APP.current.soalKana) return;
 
   const me = APP.players[0];
   if (Date.now() < me.lockedUntil) return;
@@ -1008,6 +1044,8 @@ function onCardClick(card, el) {
     resolveRound(me, card, el);
     return;
   }
+  // ... sisanya sama
+}
 
   // Salah
   me.wrong++;
@@ -1180,11 +1218,13 @@ function buildReport() {
   L.push(`  Total Skor                     : ${me.score}`);
   L.push('');
 
-  // Rincian kesalahan + koreksi materi singkat
-  const myMistakes = [];
-  r.log.forEach(l => {
-    l.salah.filter(s => s.player === me.name).forEach(s => {
-      myMistakes.push({
+  // ---- Kelompokkan kesalahan per SOAL (bukan per klik) ----
+const mistakesBySoal = new Map();
+r.log.forEach(l => {
+  const myWrongs = l.salah.filter(s => s.player === me.name);
+  if (myWrongs.length > 0) {
+    if (!mistakesBySoal.has(l.no)) {
+      mistakesBySoal.set(l.no, {
         no: l.no,
         soalKana: l.soalKana,
         soalScript: l.soalScript,
@@ -1194,31 +1234,48 @@ function buildReport() {
         grup: l.grup,
         hiragana: l.hiragana,
         katakana: l.katakana,
-        picked: s.picked,
-        pickedScript: s.pickedScript
+        wrongPicks: []
       });
+    }
+    const entry = mistakesBySoal.get(l.no);
+    myWrongs.forEach(s => {
+      entry.wrongPicks.push({ kana: s.picked, script: s.pickedScript });
     });
-  });
+  }
+});
 
-  L.push(dash);
-  L.push('  DETAIL KARTU YANG GAGAL DITEBAB & KOREKSINYA');
-  L.push(dash);
-  if (!myMistakes.length) {
-    L.push('  Luar biasa! Tidak ada kartu yang salah kamu ambil. 🎉');
-    L.push('');
-  } else {
-    myMistakes.forEach(m => {
+L.push(dash);
+L.push('  DETAIL KARTU YANG GAGAL DITEBAB & KOREKSINYA');
+L.push(dash);
+
+if (mistakesBySoal.size === 0) {
+  L.push('  Luar biasa! Tidak ada kartu yang salah kamu ambil. 🎉');
+  L.push('');
+} else {
+  Array.from(mistakesBySoal.values())
+    .sort((a, b) => a.no - b.no)
+    .forEach(m => {
       L.push('');
       L.push(`  Soal #${m.no}`);
       L.push(`    Soal          : ${m.soalKana}  (${m.soalScript})`);
       L.push(`    Bacaan        : ${m.romaji}`);
       L.push(`    Jawaban benar : ${m.jawabKana}  (${m.jawabScript})`);
-      L.push(`    Jawabanmu     : ${m.picked}  (${m.pickedScript})   [SALAH]`);
+
+      if (m.wrongPicks.length === 1) {
+        L.push(`    Jawabanmu     : ${m.wrongPicks[0].kana}  (${m.wrongPicks[0].script})   [SALAH]`);
+      } else {
+        L.push(`    Jawabanmu     :`);
+        m.wrongPicks.forEach(w => {
+          L.push(`                    - ${w.kana}  (${w.script})   [SALAH]`);
+        });
+        L.push(`    Total salah   : ${m.wrongPicks.length}× percobaan`);
+      }
+
       L.push(`    Materi singkat: Huruf "${m.romaji}" termasuk ${materiText(m.grup)}`);
       L.push(`                    Pasangan hurufnya -> Hiragana: ${m.hiragana}  |  Katakana: ${m.katakana}`);
     });
-    L.push('');
-  }
+  L.push('');
+}
 
   L.push(dash);
   L.push('  REKAP SELURUH SOAL');
